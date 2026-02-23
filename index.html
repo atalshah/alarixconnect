@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Alarix Connect - Ultimate</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- 3. Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
+    <style>
+        /* Core Styles & Mobile Fixes */
+        body { font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+        
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+        .pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        
+        /* Video Mirroring (Front Camera) */
+        video { transform: scaleX(-1); background: #111; object-fit: cover; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-gray-900 h-[100dvh] w-screen overflow-hidden text-gray-200 relative flex flex-col">
+
+    <!-- AUDIO ASSETS -->
+    <audio id="audio-ringtone" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
+    <audio id="audio-notify" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+
+    <!-- CUSTOM ANIMATED MODAL -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 p-6 w-full max-w-sm pop-in" id="custom-modal-content">
+            <h3 id="custom-modal-title" class="text-white font-bold text-lg mb-2">Title</h3>
+            <p id="custom-modal-desc" class="text-gray-400 text-sm mb-4">Description goes here</p>
+            <input type="text" id="custom-modal-input" class="hidden w-full bg-gray-900 border border-gray-600 text-white rounded-lg p-3 mb-5 outline-none focus:border-blue-500 transition">
+            <div class="flex gap-3 justify-end">
+                <button id="custom-modal-cancel" class="hidden px-5 py-2 rounded-xl text-sm font-bold text-gray-400 hover:text-white hover:bg-gray-700 transition">Cancel</button>
+                <button id="custom-modal-ok" class="px-5 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg transition transform hover:scale-105">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. SPLASH SCREEN -->
+    <div id="screen-splash" class="absolute inset-0 z-[90] flex flex-col items-center justify-center bg-gray-900">
+        <div class="relative w-24 h-24 bg-blue-600 rounded-2xl flex items-center justify-center shadow-blue-500/50 shadow-2xl mb-6 animate-bounce">
+            <span class="text-6xl font-black text-white">A</span>
+            <div class="absolute -bottom-2 -right-2 w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center border-2 border-blue-500">
+                <i class="fas fa-lock text-xs text-blue-400"></i>
+            </div>
+        </div>
+        <h1 class="text-2xl font-bold tracking-[5px] text-white">ALARIX</h1>
+        <p class="text-[10px] text-gray-500 mt-2 uppercase tracking-widest"><i class="fas fa-shield-alt mr-1"></i> End-to-End Encrypted</p>
+    </div>
+
+    <!-- 2. AUTH SCREEN -->
+    <div id="screen-auth" class="hidden absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 fade-in">
+            <div class="flex mb-6 bg-gray-700 rounded-lg p-1">
+                <button onclick="switchAuth('login')" id="tab-login" class="flex-1 py-3 rounded-md text-sm font-bold bg-blue-600 text-white shadow">Login</button>
+                <button onclick="switchAuth('signup')" id="tab-signup" class="flex-1 py-3 rounded-md text-sm font-bold text-gray-400">Sign Up</button>
+            </div>
+
+            <!-- Login -->
+            <div id="form-login">
+                <input type="text" id="login-user" class="w-full bg-gray-900 border border-gray-600 text-white rounded-xl p-4 mb-4 outline-none focus:border-blue-500" placeholder="Username (e.g. john_alrx)">
+                <input type="password" id="login-pass" class="w-full bg-gray-900 border border-gray-600 text-white rounded-xl p-4 mb-6 outline-none focus:border-blue-500" placeholder="Password">
+                <button onclick="handleLogin()" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg">Login</button>
+            </div>
+
+            <!-- Signup -->
+            <div id="form-signup" class="hidden">
+                <div class="flex flex-col items-center mb-4">
+                    <div class="w-24 h-24 rounded-full border-4 border-gray-600 overflow-hidden relative bg-gray-700 shadow-inner">
+                        <img id="preview-avatar" src="https://i.ibb.co/51y8P5h/default-avatar.png" class="w-full h-full object-cover">
+                        <input type="file" id="input-profile-file" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-2 font-semibold tracking-wide">TAP TO UPLOAD</p>
+                </div>
+                <input type="text" id="signup-user" class="w-full bg-gray-900 border border-gray-600 text-white rounded-xl p-4 mb-3 outline-none" placeholder="Username (must end in 'alrx')">
+                <input type="password" id="signup-pass" class="w-full bg-gray-900 border border-gray-600 text-white rounded-xl p-4 mb-4 outline-none" placeholder="Password (Min 5 chars)">
+                <button onclick="handleSignup()" id="btn-signup" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition shadow-lg">Create Account</button>
+            </div>
+            <p id="auth-error" class="text-red-400 text-sm font-semibold text-center mt-4 h-5"></p>
+        </div>
+    </div>
+
+    <!-- 3. HOME SCREEN -->
+    <div id="screen-home" class="hidden absolute inset-0 bg-gray-900 flex flex-col z-10">
+        <!-- Header -->
+        <div class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center shadow-md shrink-0">
+            <div class="flex items-center gap-3">
+                <img id="home-avatar" src="" class="w-11 h-11 rounded-full object-cover border-2 border-blue-500">
+                <div>
+                    <h3 id="home-username" class="font-bold text-base text-white"></h3>
+                    <p class="text-[11px] text-green-400 font-medium tracking-wide">● Online</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="createGroup()" class="w-11 h-11 rounded-full bg-gray-700 text-green-400 hover:bg-green-600 hover:text-white transition flex items-center justify-center text-lg shadow"><i class="fas fa-users"></i></button>
+                <button onclick="openSearch()" class="w-11 h-11 rounded-full bg-gray-700 text-white hover:bg-blue-600 transition flex items-center justify-center text-lg shadow"><i class="fas fa-search"></i></button>
+                <button onclick="logout()" class="w-11 h-11 rounded-full bg-gray-700 text-red-400 hover:bg-red-900 transition flex items-center justify-center text-lg shadow"><i class="fas fa-power-off"></i></button>
+            </div>
+        </div>
+
+        <!-- Recent Chats -->
+        <div class="flex-1 overflow-y-auto" id="recent-chats-list">
+            <div class="flex flex-col items-center justify-center h-full text-gray-600">
+                <i class="fas fa-comments text-5xl mb-4 opacity-20"></i>
+                <p class="text-base font-medium">No recent chats</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. SEARCH SECTION -->
+    <div id="screen-search" class="hidden absolute inset-0 z-20 bg-gray-900 flex flex-col">
+        <div class="p-4 bg-gray-800 border-b border-gray-700 flex items-center gap-3 shrink-0">
+            <button onclick="closeSearch()" class="w-10 h-10 text-gray-400 hover:text-white text-xl"><i class="fas fa-arrow-left"></i></button>
+            <input type="text" id="search-input" class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 outline-none text-white placeholder-gray-500 focus:border-blue-500" placeholder="Search username...">
+            <button onclick="executeSearch()" class="px-4 py-3 bg-blue-600 rounded-xl text-white font-bold shadow-md">Find</button>
+        </div>
+        <div id="search-results" class="flex-1 p-4 overflow-y-auto space-y-2"></div>
+    </div>
+
+    <!-- 5. CHAT SCREEN (FITS MOBILE PERFECTLY) -->
+    <div id="screen-chat" class="hidden absolute inset-0 bg-gray-900 flex flex-col z-30 transition-transform duration-300 transform translate-x-full">
+        
+        <!-- Header (Fixed Top) -->
+        <div class="bg-gray-800 border-b border-gray-700 p-3 flex items-center justify-between shadow-md z-10 shrink-0">
+            <div class="flex items-center gap-2">
+                <button onclick="closeChat()" class="text-gray-400 w-10 h-10 flex items-center justify-center text-xl"><i class="fas fa-arrow-left"></i></button>
+                <img id="chat-header-img" class="w-10 h-10 rounded-full object-cover border border-gray-600">
+                <div class="ml-1">
+                    <h3 id="chat-header-name" class="font-bold text-sm text-white truncate max-w-[120px]">User</h3>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-lock text-[9px] text-gray-500"></i>
+                        <p class="text-[10px] text-gray-400 font-medium">E2E Encrypted</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button id="btn-add-member" onclick="addGroupMember()" class="hidden w-10 h-10 rounded-full bg-gray-700 text-green-400 text-lg shadow"><i class="fas fa-user-plus"></i></button>
+                <button id="btn-call-audio" onclick="startCall('audio')" class="w-10 h-10 rounded-full bg-gray-700 text-blue-400 text-lg shadow"><i class="fas fa-phone"></i></button>
+                <button id="btn-call-video" onclick="startCall('video')" class="w-10 h-10 rounded-full bg-gray-700 text-blue-400 text-lg shadow"><i class="fas fa-video"></i></button>
+            </div>
+        </div>
+
+        <!-- Messages Area (Scrollable Middle) -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth"></div>
+
+        <!-- Input Area (Fixed Bottom - Uses Flex naturally) -->
+        <div class="bg-gray-800 border-t border-gray-700 p-3 flex gap-2 items-center shrink-0">
+            <label class="w-11 h-11 rounded-full bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center cursor-pointer shadow shrink-0 text-xl">
+                <i class="fas fa-image"></i>
+                <input type="file" id="chat-image-input" class="hidden" accept="image/*">
+            </label>
+            
+            <input type="text" id="chat-input" class="flex-1 bg-gray-900 border border-gray-700 text-white rounded-full px-5 py-3 text-sm outline-none placeholder-gray-500 focus:border-blue-500 shadow-inner" placeholder="Type a message...">
+            
+            <button onclick="sendMessage('text')" class="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-lg text-lg transform transition active:scale-90">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 6. MESSAGE OPTIONS (BOTTOM SHEET STYLE) -->
+    <div id="msg-options" class="hidden fixed inset-0 z-[60] bg-black/70 flex items-end justify-center fade-in" onclick="closeMsgOptions()">
+        <div class="bg-gray-800 w-full sm:w-96 rounded-t-3xl p-6 shadow-2xl border-t border-gray-700" onclick="event.stopPropagation()">
+            <div class="w-12 h-1.5 bg-gray-600 rounded-full mx-auto mb-6"></div>
+            
+            <!-- Reactions -->
+            <div class="flex justify-around mb-6 bg-gray-900 p-3 rounded-2xl shadow-inner border border-gray-700">
+                <button onclick="reactToMsg('❤️')" class="text-3xl hover:scale-125 transition">❤️</button>
+                <button onclick="reactToMsg('😂')" class="text-3xl hover:scale-125 transition">😂</button>
+                <button onclick="reactToMsg('😮')" class="text-3xl hover:scale-125 transition">😮</button>
+                <button onclick="reactToMsg('👍')" class="text-3xl hover:scale-125 transition">👍</button>
+                <button onclick="reactToMsg('😢')" class="text-3xl hover:scale-125 transition">😢</button>
+            </div>
+
+            <!-- Actions -->
+            <div class="space-y-3">
+                <button id="opt-copy" onclick="copyMsgText()" class="w-full text-left p-4 rounded-xl hover:bg-gray-700 bg-gray-750 border border-gray-700 text-base font-bold flex items-center gap-4 shadow"><i class="fas fa-copy text-blue-400 text-xl"></i> Copy Text</button>
+                <button id="opt-download" onclick="downloadImage()" class="w-full text-left p-4 rounded-xl hover:bg-gray-700 bg-gray-750 border border-gray-700 text-base font-bold flex items-center gap-4 shadow hidden"><i class="fas fa-download text-green-400 text-xl"></i> Download Image</button>
+                <button id="opt-delete" onclick="deleteMsg()" class="w-full text-left p-4 rounded-xl hover:bg-gray-700 bg-gray-750 border border-gray-700 text-base font-bold flex items-center gap-4 text-red-400 shadow hidden"><i class="fas fa-trash text-xl"></i> Delete For Everyone</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. CALL SCREEN -->
+    <div id="screen-call" class="hidden fixed inset-0 z-[70] bg-gray-900 flex flex-col fade-in">
+        <div class="relative flex-1 bg-black overflow-hidden rounded-b-3xl shadow-2xl">
+            <!-- Main Remote Video (Bari screen par doosra user) -->
+            <video id="video-remote" class="w-full h-full object-cover" autoplay playsinline></video>
+            
+            <!-- Local Video PIP (Choti screen par apna front camera) -->
+            <div id="local-video-container" class="absolute top-16 right-4 w-28 h-40 bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-500 shadow-2xl z-20">
+                <video id="video-local" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            </div>
+
+            <!-- Info overlay for Audio calls -->
+            <div id="call-info-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-10 hidden">
+                <img id="call-user-avatar" class="w-32 h-32 rounded-full border-4 border-gray-700 shadow-2xl animate-pulse object-cover" src="">
+                <h2 id="call-user-name" class="text-white font-bold text-2xl mt-6">User Name</h2>
+                <p class="text-green-400 text-base font-medium mt-1">Audio Call Active</p>
+            </div>
+
+            <!-- Timer -->
+            <div class="absolute top-12 left-4 bg-black/60 px-5 py-2 rounded-full border border-white/20 z-20 shadow">
+                <span id="call-timer" class="text-white text-sm font-mono tracking-widest">00:00</span>
+            </div>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="bg-gray-900 p-8 flex justify-center items-center gap-8 shrink-0 z-30">
+            <button onclick="endCall()" class="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white text-3xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.5)] transition transform hover:scale-105 active:scale-95"><i class="fas fa-phone-slash"></i></button>
+        </div>
+    </div>
+
+    <!-- 8. INCOMING CALL MODAL -->
+    <div id="incoming-call-modal" class="hidden fixed top-8 left-4 right-4 z-[80] bg-gray-800 rounded-2xl shadow-2xl p-4 border-l-4 border-blue-500 animate-bounce">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-full bg-blue-900/50 flex items-center justify-center text-blue-400 text-2xl animate-pulse border border-blue-500"><i class="fas fa-phone"></i></div>
+                <div>
+                    <h4 class="font-bold text-white text-base">Incoming Call</h4>
+                    <p id="incoming-caller-name" class="text-sm text-gray-400 font-medium">User is calling...</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="rejectIncomingCall()" class="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center text-xl hover:bg-red-500/30"><i class="fas fa-times"></i></button>
+                <button onclick="acceptIncomingCall()" class="w-12 h-12 bg-green-600 text-white rounded-full flex items-center justify-center text-xl shadow-lg hover:bg-green-700"><i class="fas fa-phone"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SETUP & CUSTOM MODAL ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCogL9JFzyBEk9zp-IuruMKR9sRgXGF-Ac",
+            authDomain: "alarix.firebaseapp.com",
+            databaseURL: "https://alarix-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "alarix",
+            storageBucket: "alarix.firebasestorage.app",
+            messagingSenderId: "647856091661",
+            appId: "1:647856091661:web:5eb4bfd361ca577dfadb44"
+        };
+        const IMG_BB_KEY = "1e9b151a1301a93017bfa29a913708cd";
+
+        try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+        const db = firebase.database();
+
+        let currentUser = null;
+        let currentChatUser = null;
+        let selectedMsgId = null; 
+        let currentMessagesMap = {}; 
+
+        // WebRTC Vars
+        let localStream = null;
+        let peerConnection = null;
+        let callTimerInt = null;
+        let incomingCallData = null;
+        
+        // Extended STUN Servers for better connection
+        const rtcConfig = { 
+            iceServers: [
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ] 
+        };
+        
+        const ringtone = document.getElementById('audio-ringtone');
+        const notifSound = document.getElementById('audio-notify');
+
+        // CUSTOM MODAL LOGIC
+        function showModal({ title, desc, type = 'alert', placeholder = '', onOk }) {
+            const modal = document.getElementById('custom-modal');
+            const content = document.getElementById('custom-modal-content');
+            
+            document.getElementById('custom-modal-title').innerText = title;
+            document.getElementById('custom-modal-desc').innerText = desc || '';
+            
+            const input = document.getElementById('custom-modal-input');
+            const cancelBtn = document.getElementById('custom-modal-cancel');
+            const okBtn = document.getElementById('custom-modal-ok');
+
+            input.value = '';
+            if(type === 'prompt') {
+                input.classList.remove('hidden');
+                input.placeholder = placeholder;
+                setTimeout(() => input.focus(), 100);
+            } else { input.classList.add('hidden'); }
+
+            if(type === 'alert') cancelBtn.classList.add('hidden');
+            else cancelBtn.classList.remove('hidden');
+
+            modal.classList.remove('hidden');
+            content.classList.remove('scale-95');
+            content.classList.add('pop-in');
+
+            okBtn.onclick = () => {
+                closeModal();
+                if(type === 'prompt') onOk && onOk(input.value);
+                else onOk && onOk();
+            };
+            cancelBtn.onclick = closeModal;
+        }
+
+        function closeModal() { document.getElementById('custom-modal').classList.add('hidden'); }
+
+        // --- 2. ENCRYPTION ---
+        function encrypt(text, key) {
+            let result = "";
+            for(let i=0; i<text.length; i++) result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            return btoa(result);
+        }
+
+        function decrypt(encoded, key) {
+            try {
+                let text = atob(encoded); let result = "";
+                for(let i=0; i<text.length; i++) result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+                return result;
+            } catch(e) { return "Encrypted Message"; }
+        }
+
+        function getChatId() {
+            if (!currentChatUser) return null;
+            if (currentChatUser.isGroup) return currentChatUser.uid;
+            return [currentUser.uid, currentChatUser.uid].sort().join('_');
+        }
+
+        // --- 3. AUTHENTICATION ---
+        function switchAuth(mode) {
+            const login = document.getElementById('form-login');
+            const signup = document.getElementById('form-signup');
+            const tLog = document.getElementById('tab-login');
+            const tSign = document.getElementById('tab-signup');
+            
+            if(mode === 'login') {
+                login.classList.remove('hidden'); signup.classList.add('hidden');
+                tLog.className = "flex-1 py-3 rounded-md text-sm font-bold bg-blue-600 text-white shadow";
+                tSign.className = "flex-1 py-3 rounded-md text-sm font-bold text-gray-400";
+            } else {
+                signup.classList.remove('hidden'); login.classList.add('hidden');
+                tSign.className = "flex-1 py-3 rounded-md text-sm font-bold bg-blue-600 text-white shadow";
+                tLog.className = "flex-1 py-3 rounded-md text-sm font-bold text-gray-400";
+            }
+            document.getElementById('auth-error').innerText = "";
+        }
+
+        async function handleSignup() {
+            const user = document.getElementById('signup-user').value.trim().toLowerCase();
+            const pass = document.getElementById('signup-pass').value;
+            const file = document.getElementById('input-profile-file').files[0];
+            const err = document.getElementById('auth-error');
+
+            if(!file || !user.endsWith('alrx') || pass.length < 5) return err.innerText = "Invalid inputs. Must end in 'alrx' and password > 4 chars.";
+
+            document.getElementById('btn-signup').innerText = "Processing...";
+
+            db.ref('usernames/' + user).once('value', async snap => {
+                if(snap.exists()) {
+                    document.getElementById('btn-signup').innerText = "Create Account";
+                    return err.innerText = "Username taken.";
+                }
+
+                const fd = new FormData(); fd.append("image", file);
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: fd });
+                const json = await res.json();
+                
+                const uid = user + "_" + Date.now();
+                const data = { username: user, pass, photo: json.data.url, uid };
+
+                await db.ref('users/' + uid).set(data);
+                await db.ref('usernames/' + user).set(uid);
+                startSession(data);
+            });
+        }
+
+        function handleLogin() {
+            const user = document.getElementById('login-user').value.trim().toLowerCase();
+            const pass = document.getElementById('login-pass').value;
+            const err = document.getElementById('auth-error');
+
+            if(!user || !pass) return err.innerText = "Enter credentials.";
+
+            db.ref('usernames/' + user).once('value', snap => {
+                if(!snap.exists()) return err.innerText = "User not found.";
+                db.ref('users/' + snap.val()).once('value', uSnap => {
+                    const uData = uSnap.val();
+                    if(uData && uData.pass === pass) startSession(uData);
+                    else err.innerText = "Wrong password.";
+                });
+            });
+        }
+
+        function startSession(user) {
+            currentUser = user;
+            if(!currentUser.uid) currentUser.uid = currentUser.username + "_" + Date.now();
+            localStorage.setItem('alarix_ultimate_user', JSON.stringify(currentUser));
+
+            document.getElementById('home-avatar').src = currentUser.photo;
+            document.getElementById('home-username').innerText = currentUser.username;
+            
+            document.getElementById('screen-auth').classList.add('hidden');
+            document.getElementById('screen-splash').classList.add('hidden');
+            document.getElementById('screen-home').classList.remove('hidden');
+
+            requestPermissions();
+            listenForRecentChats();
+            listenForIncomingCalls();
+            listenForPushNotifications();
+        }
+
+        function requestPermissions() {
+            if("Notification" in window && Notification.permission !== "granted") Notification.requestPermission();
+            navigator.mediaDevices.getUserMedia({video:true, audio:true}).then(s => s.getTracks().forEach(t=>t.stop())).catch(()=>{});
+        }
+
+        function listenForPushNotifications() {
+            const notifyLogic = (snap) => {
+                const data = snap.val();
+                if (Date.now() - data.timestamp < 5000) { 
+                    if (!currentChatUser || currentChatUser.uid !== snap.key) {
+                        notifSound.play().catch(()=>{});
+                        if ("Notification" in window && Notification.permission === "granted") new Notification(data.username, { body: data.lastMsg, icon: data.photo });
+                    }
+                }
+            };
+            db.ref(`recent/${currentUser.uid}`).on('child_changed', notifyLogic);
+            db.ref(`recent/${currentUser.uid}`).on('child_added', notifyLogic);
+        }
+
+        function logout() { localStorage.removeItem('alarix_ultimate_user'); location.reload(); }
+
+        window.onload = () => {
+            const saved = localStorage.getItem('alarix_ultimate_user');
+            setTimeout(() => {
+                if(saved) startSession(JSON.parse(saved));
+                else {
+                    document.getElementById('screen-splash').classList.add('hidden');
+                    document.getElementById('screen-auth').classList.remove('hidden');
+                }
+            }, 2000);
+        };
+
+        // --- 4. GROUPS AND HOME ---
+        function listenForRecentChats() {
+            const list = document.getElementById('recent-chats-list');
+            db.ref(`recent/${currentUser.uid}`).orderByChild('timestamp').on('value', snap => {
+                if(!snap.exists()) return list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-gray-600"><i class="fas fa-comments text-5xl mb-4 opacity-20"></i><p class="text-base font-medium">No recent chats</p></div>`;
+                
+                list.innerHTML = "";
+                const chatsArray = [];
+                snap.forEach(child => { chatsArray.push({key: child.key, data: child.val()}); });
+                
+                chatsArray.reverse().forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center gap-4 p-4 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition";
+                    div.innerHTML = `
+                        <div class="relative shrink-0">
+                            <img src="${item.data.photo}" class="w-14 h-14 rounded-full object-cover border border-gray-600">
+                            ${item.data.isGroup ? '<div class="absolute bottom-0 right-0 bg-gray-800 rounded-full w-5 h-5 flex items-center justify-center border border-gray-600 shadow"><i class="fas fa-users text-[10px] text-green-400"></i></div>' : ''}
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <h4 class="font-bold text-white text-base truncate">${item.data.username}</h4>
+                            <p class="text-sm text-gray-400 truncate w-full mt-0.5">${item.data.lastMsg}</p>
+                        </div>
+                    `;
+                    div.onclick = () => {
+                        const path = item.data.isGroup ? `groups/${item.key}` : `users/${item.key}`;
+                        db.ref(path).once('value', s => {
+                            let obj = s.val() || { uid: item.key, username: item.data.username, photo: item.data.photo, isGroup: item.data.isGroup };
+                            openChat(obj);
+                        });
+                    };
+                    list.appendChild(div);
+                });
+            });
+        }
+
+        function createGroup() {
+            showModal({
+                title: "Create Group", desc: "Enter a name for your new group:", type: "prompt", placeholder: "Friends Group",
+                onOk: async (name) => {
+                    if(!name || !name.trim()) return;
+                    const groupId = 'group_' + Date.now() + '_' + currentUser.uid.substring(0, 5);
+                    const groupData = { uid: groupId, username: name.trim(), photo: 'https://cdn-icons-png.flaticon.com/512/615/615075.png', isGroup: true, memberCount: 1, admin: currentUser.uid, members: { [currentUser.uid]: true } };
+
+                    await db.ref('groups/' + groupId).set(groupData);
+                    await db.ref(`recent/${currentUser.uid}/${groupId}`).update({ username: groupData.username, photo: groupData.photo, lastMsg: 'You created this group', timestamp: firebase.database.ServerValue.TIMESTAMP, isGroup: true });
+                    openChat(groupData);
+                }
+            });
+        }
+
+        function addGroupMember() {
+            if(!currentChatUser || !currentChatUser.isGroup) return;
+            showModal({
+                title: "Add Member", desc: "Enter exact username to add (e.g., ali_alrx):", type: "prompt", placeholder: "Username...",
+                onOk: async (uname) => {
+                    if(!uname || !uname.trim()) return;
+                    const snap = await db.ref('usernames/' + uname.trim().toLowerCase()).once('value');
+                    if(!snap.exists()) return showModal({title: "Error", desc: "User not found!"});
+                    const newUid = snap.val();
+
+                    const gSnap = await db.ref('groups/' + currentChatUser.uid).once('value');
+                    const gData = gSnap.val();
+                    if(gData.memberCount >= 100) return showModal({title: "Limit Reached", desc: "Max 100 members allowed!"});
+                    if(gData.members && gData.members[newUid]) return showModal({title: "Notice", desc: "User is already in the group."});
+
+                    await db.ref('groups/' + currentChatUser.uid + '/members/' + newUid).set(true);
+                    await db.ref('groups/' + currentChatUser.uid + '/memberCount').set(gData.memberCount + 1);
+                    await db.ref(`recent/${newUid}/${currentChatUser.uid}`).update({ username: gData.username, photo: gData.photo, lastMsg: `${currentUser.username} added you`, timestamp: firebase.database.ServerValue.TIMESTAMP, isGroup: true });
+
+                    showModal({title: "Success", desc: `User ${uname} has been added!`});
+                }
+            });
+        }
+
+        // --- 5. SEARCH ---
+        function openSearch() { document.getElementById('screen-search').classList.remove('hidden'); document.getElementById('search-input').focus(); }
+        function closeSearch() { document.getElementById('screen-search').classList.add('hidden'); }
+        function executeSearch() {
+            const q = document.getElementById('search-input').value.trim().toLowerCase();
+            const resBox = document.getElementById('search-results');
+            resBox.innerHTML = '<p class="text-center text-gray-500 mt-5 font-medium">Searching...</p>';
+
+            db.ref('usernames/' + q).once('value', snap => {
+                resBox.innerHTML = '';
+                if(snap.exists()) {
+                    const uid = snap.val();
+                    if(uid === currentUser.uid) return resBox.innerHTML = '<p class="text-center text-gray-500 mt-5">You found yourself!</p>';
+                    db.ref('users/' + uid).once('value', uSnap => {
+                        const user = uSnap.val(); if(!user) return;
+                        const div = document.createElement('div');
+                        div.className = "flex items-center gap-4 p-4 bg-gray-800 rounded-xl cursor-pointer hover:bg-gray-700 transition shadow";
+                        div.innerHTML = `<img src="${user.photo}" class="w-12 h-12 rounded-full object-cover"><div><h4 class="font-bold text-white text-base">${user.username}</h4><p class="text-sm text-blue-400">Tap to chat</p></div>`;
+                        div.onclick = () => { closeSearch(); openChat(user); };
+                        resBox.appendChild(div);
+                    });
+                } else resBox.innerHTML = '<p class="text-center text-gray-500 mt-5">User not found</p>';
+            });
+        }
+
+        // --- 6. CHAT LOGIC ---
+        function openChat(userObj) {
+            currentChatUser = userObj;
+            document.getElementById('chat-header-img').src = currentChatUser.photo;
+            document.getElementById('chat-header-name').innerText = currentChatUser.username;
+            
+            const isGrp = currentChatUser.isGroup === true;
+            document.getElementById('btn-add-member').classList.toggle('hidden', !isGrp);
+            document.getElementById('btn-call-audio').classList.toggle('hidden', isGrp);
+            document.getElementById('btn-call-video').classList.toggle('hidden', isGrp);
+
+            document.getElementById('screen-chat').classList.remove('hidden');
+            setTimeout(() => document.getElementById('screen-chat').classList.remove('translate-x-full'), 10);
+
+            const chatId = getChatId();
+            const box = document.getElementById('chat-messages');
+            box.innerHTML = ''; currentMessagesMap = {}; 
+
+            const chatRef = db.ref('chats/' + chatId);
+            chatRef.off(); 
+
+            chatRef.limitToLast(100).on('child_added', snap => {
+                currentMessagesMap[snap.key] = snap.val();
+                box.insertAdjacentHTML('beforeend', createMessageHTML(snap.key, snap.val()));
+                box.scrollTop = box.scrollHeight;
+            });
+
+            chatRef.limitToLast(100).on('child_changed', snap => {
+                currentMessagesMap[snap.key] = snap.val();
+                const oldDiv = document.getElementById('msg-' + snap.key);
+                if(oldDiv) oldDiv.outerHTML = createMessageHTML(snap.key, snap.val());
+            });
+        }
+
+        function closeChat() {
+            document.getElementById('screen-chat').classList.add('translate-x-full');
+            setTimeout(() => { document.getElementById('screen-chat').classList.add('hidden'); currentChatUser = null; const chatId = getChatId(); if(chatId) db.ref('chats/' + chatId).off(); }, 300);
+        }
+
+        function createMessageHTML(key, msg) {
+            const chatId = getChatId(); const decryptedText = decrypt(msg.text, chatId); const isMe = msg.sender === currentUser.uid;
+            let contentHtml = msg.type === 'image' ? `<img src="${decryptedText}" class="rounded-lg max-w-[220px] border border-gray-600 mb-1">` : `<span class="break-words text-[15px]">${msg.isDeleted ? '<i class="text-gray-400 text-xs">Deleted message</i>' : decryptedText}</span>`;
+
+            let reactionHtml = '';
+            if(msg.reactions) {
+                const counts = {}; for(let uid in msg.reactions) counts[msg.reactions[uid]] = (counts[msg.reactions[uid]] || 0) + 1;
+                let rInner = ''; for(let emoji in counts) rInner += `<span class="bg-gray-800 rounded-full px-2 py-0.5 text-[12px] border border-gray-600 mr-1 shadow-md font-bold">${emoji} ${counts[emoji]}</span>`;
+                reactionHtml = `<div class="absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex flex-row z-10 fade-in">${rInner}</div>`;
+            }
+
+            const mb = msg.reactions ? 'mb-8' : 'mb-3';
+            return `
+                <div class="flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${mb} relative" id="msg-${key}" onclick="openMsgOptions('${key}')">
+                    <div class="relative max-w-[80%] cursor-pointer active:scale-95 transition-transform">
+                        <div class="p-3.5 rounded-2xl shadow-md ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-700 text-gray-200 rounded-tl-none'} relative">
+                            ${contentHtml}
+                            <p class="text-[10px] opacity-70 text-right mt-1.5 font-medium">${new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                        </div>
+                        ${reactionHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('chat-image-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            const btn = document.querySelector('.fa-image'); btn.className = "fas fa-spinner fa-spin text-blue-400";
+            const fd = new FormData(); fd.append("image", file);
+            try { const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: fd }); const json = await res.json(); if(json.success) sendMessage('image', json.data.url); } catch(err) { showModal({title: "Error", desc: "Upload failed"}); }
+            btn.className = "fas fa-image"; e.target.value = ""; 
+        });
+
+        async function sendMessage(type, content = null) {
+            const input = document.getElementById('chat-input'); let text = content || input.value.trim(); if(!text) return;
+            const chatId = getChatId(); db.ref('chats/' + chatId).push({ sender: currentUser.uid, text: encrypt(text, chatId), type: type, timestamp: firebase.database.ServerValue.TIMESTAMP });
+            const lastMsgLabel = type === 'image' ? '📷 Photo' : (currentChatUser.isGroup ? `${currentUser.username}: Msg` : 'Encrypted Msg');
+
+            if (currentChatUser.isGroup) {
+                db.ref(`groups/${currentChatUser.uid}/members`).once('value', mSnap => {
+                    for(let mUid in mSnap.val()) db.ref(`recent/${mUid}/${currentChatUser.uid}`).update({ username: currentChatUser.username, photo: currentChatUser.photo, lastMsg: lastMsgLabel, timestamp: firebase.database.ServerValue.TIMESTAMP, isGroup: true });
+                });
+            } else {
+                db.ref(`recent/${currentUser.uid}/${currentChatUser.uid}`).update({ username: currentChatUser.username, photo: currentChatUser.photo, lastMsg: lastMsgLabel, timestamp: firebase.database.ServerValue.TIMESTAMP });
+                db.ref(`recent/${currentChatUser.uid}/${currentUser.uid}`).update({ username: currentUser.username, photo: currentUser.photo, lastMsg: lastMsgLabel, timestamp: firebase.database.ServerValue.TIMESTAMP });
+            }
+            if(type === 'text') input.value = '';
+        }
+
+        // --- 7. MESSAGE OPTIONS & REACTIONS ---
+        function openMsgOptions(id) {
+            const msg = currentMessagesMap[id]; if(!msg) return;
+            selectedMsgId = id; const isMe = msg.sender === currentUser.uid;
+            document.getElementById('opt-copy').classList.toggle('hidden', msg.type === 'image' || msg.isDeleted);
+            document.getElementById('opt-download').classList.toggle('hidden', msg.type !== 'image' || msg.isDeleted);
+            document.getElementById('opt-delete').classList.toggle('hidden', !isMe || msg.isDeleted);
+            document.getElementById('msg-options').classList.remove('hidden');
+        }
+
+        function closeMsgOptions() { document.getElementById('msg-options').classList.add('hidden'); selectedMsgId = null; }
+
+        function reactToMsg(emoji) {
+            if(!selectedMsgId) return;
+            db.ref(`chats/${getChatId()}/${selectedMsgId}/reactions/${currentUser.uid}`).set(emoji);
+            closeMsgOptions();
+        }
+
+        function copyMsgText() {
+            const msg = currentMessagesMap[selectedMsgId];
+            if(msg) navigator.clipboard.writeText(decrypt(msg.text, getChatId())).then(() => showModal({title: "Copied!", desc: "Message text copied."}));
+            closeMsgOptions();
+        }
+
+        function downloadImage() {
+            const msg = currentMessagesMap[selectedMsgId];
+            if(msg) {
+                const link = document.createElement('a'); link.href = decrypt(msg.text, getChatId()); link.target = "_blank"; link.download = "alarix_img.jpg";
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            }
+            closeMsgOptions();
+        }
+
+        function deleteMsg() {
+            showModal({
+                title: "Delete Message", desc: "Delete this for everyone?", type: "confirm",
+                onOk: () => {
+                    const chatId = getChatId();
+                    db.ref(`chats/${chatId}/${selectedMsgId}`).update({ text: encrypt("Deleted message", chatId), isDeleted: true, type: 'text', reactions: null });
+                    closeMsgOptions();
+                }
+            });
+        }
+
+        // --- 8. CALLING (BIDIRECTIONAL & FRONT CAMERA) ---
+        function setupCallUI(isAudioOnly, userData) {
+            document.getElementById('screen-call').classList.remove('hidden');
+            if(isAudioOnly) {
+                document.getElementById('video-remote').classList.add('hidden');
+                document.getElementById('local-video-container').classList.add('hidden');
+                document.getElementById('call-info-overlay').classList.remove('hidden');
+                document.getElementById('call-user-avatar').src = userData.photo;
+                document.getElementById('call-user-name').innerText = userData.username;
+            } else {
+                document.getElementById('video-remote').classList.remove('hidden');
+                document.getElementById('local-video-container').classList.remove('hidden');
+                document.getElementById('call-info-overlay').classList.add('hidden');
+            }
+        }
+
+        async function startCall(type) {
+            if(!currentChatUser || currentChatUser.isGroup) return;
+            try {
+                // Important: Get user facing mode (Front Camera)
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: type === 'video' ? { facingMode: 'user' } : false, 
+                    audio: true 
+                });
+                if(type === 'video') document.getElementById('video-local').srcObject = localStream;
+            } catch(e) { return showModal({title: "Camera/Mic Required", desc: "Please allow permissions."}); }
+
+            setupCallUI(type === 'audio', currentChatUser);
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            // Received stream assignment
+            peerConnection.ontrack = e => {
+                if(e.streams && e.streams[0]) document.getElementById('video-remote').srcObject = e.streams[0];
+            };
+
+            peerConnection.onicecandidate = e => {
+                if(e.candidate) db.ref(`calls/${currentChatUser.uid}/candidate`).push(e.candidate.toJSON());
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            db.ref(`calls/${currentChatUser.uid}/incoming`).set({
+                caller: currentUser.uid, callerName: currentUser.username, callerPhoto: currentUser.photo, type: type, sdp: offer.sdp, offerType: offer.type
+            });
+
+            db.ref(`calls/${currentChatUser.uid}/answer`).on('value', snap => {
+                const val = snap.val();
+                if(val && !peerConnection.currentRemoteDescription) {
+                    peerConnection.setRemoteDescription(new RTCSessionDescription(val));
+                    startTimer();
+                }
+            });
+            
+            db.ref(`calls/${currentChatUser.uid}/answerCandidate`).on('child_added', s => {
+                if(peerConnection.remoteDescription) peerConnection.addIceCandidate(new RTCIceCandidate(s.val()));
+            });
+        }
+
+        function listenForIncomingCalls() {
+            db.ref(`calls/${currentUser.uid}/incoming`).on('value', snap => {
+                const d = snap.val();
+                if(d) {
+                    incomingCallData = d;
+                    document.getElementById('incoming-caller-name').innerText = `${d.callerName} is calling...`;
+                    document.getElementById('incoming-call-modal').classList.remove('hidden');
+                    ringtone.play().catch(()=>{});
+                } else {
+                    document.getElementById('incoming-call-modal').classList.add('hidden');
+                    ringtone.pause();
+                }
+            });
+        }
+
+        async function acceptIncomingCall() {
+            ringtone.pause();
+            document.getElementById('incoming-call-modal').classList.add('hidden');
+            
+            const isVideo = incomingCallData.type === 'video';
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: isVideo ? { facingMode: 'user' } : false, 
+                    audio: true 
+                });
+                if(isVideo) document.getElementById('video-local').srcObject = localStream;
+            } catch(e) { return showModal({title: "Camera/Mic Required", desc: "Please allow permissions."}); }
+
+            // Fake user object for overlay if audio call
+            const callerObj = { username: incomingCallData.callerName, photo: incomingCallData.callerPhoto || 'https://i.ibb.co/51y8P5h/default-avatar.png' };
+            setupCallUI(!isVideo, callerObj);
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+            
+            peerConnection.ontrack = e => {
+                if(e.streams && e.streams[0]) document.getElementById('video-remote').srcObject = e.streams[0];
+            };
+            
+            peerConnection.onicecandidate = e => {
+                if(e.candidate) db.ref(`calls/${currentUser.uid}/answerCandidate`).push(e.candidate.toJSON());
+            };
+
+            db.ref(`calls/${incomingCallData.caller}/candidate`).on('child_added', s => {
+                if(peerConnection) peerConnection.addIceCandidate(new RTCIceCandidate(s.val()));
+            });
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription({type: incomingCallData.offerType, sdp: incomingCallData.sdp}));
+            const ans = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(ans);
+            
+            db.ref(`calls/${currentUser.uid}/answer`).set({type: ans.type, sdp: ans.sdp});
+            startTimer();
+        }
+
+        function rejectIncomingCall() {
+            ringtone.pause();
+            document.getElementById('incoming-call-modal').classList.add('hidden');
+            db.ref(`calls/${currentUser.uid}/incoming`).remove();
+        }
+
+        function endCall() {
+            if(localStream) localStream.getTracks().forEach(t => t.stop());
+            if(peerConnection) peerConnection.close();
+            document.getElementById('screen-call').classList.add('hidden');
+            clearInterval(callTimerInt);
+            
+            if(currentChatUser) db.ref(`calls/${currentChatUser.uid}`).remove();
+            db.ref(`calls/${currentUser.uid}`).remove();
+            
+            // Reload removes bugs safely for next call
+            setTimeout(() => location.reload(), 500);
+        }
+
+        function startTimer() {
+            let sec = 0; clearInterval(callTimerInt);
+            callTimerInt = setInterval(() => {
+                sec++;
+                const m = Math.floor(sec/60).toString().padStart(2,'0');
+                const s = (sec%60).toString().padStart(2,'0');
+                document.getElementById('call-timer').innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>
